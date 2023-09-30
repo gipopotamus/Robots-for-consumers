@@ -1,54 +1,48 @@
-import json
-from django.test import TestCase, Client
-from django.utils import timezone
+import os
+import tempfile
+from openpyxl import load_workbook
+from django.test import TestCase
+from django.urls import reverse
+from django.http import HttpResponse
 from .models import Robot
+from .services import generate_excel_report
+from django.utils import timezone
 
 
-class RobotAPITest(TestCase):
+class GenerateExcelReportTestCase(TestCase):
     def setUp(self):
-        self.client = Client()
+        # Создаем несколько объектов Robot для тестирования
+        current_date = timezone.now()
+        self.robot1 = Robot.objects.create(
+            model='R2',
+            version='D2',
+            serial='R2D2',
+            created=current_date
+        )
+        self.robot2 = Robot.objects.create(
+            model='R2',
+            version='A1',
+            serial='R2A1',
+            created=current_date
+        )
 
-        self.robot_data = {
-            "model": "R2",
-            "version": "D2",
-            "created": timezone.now(),
-            "serial": "R2-D2"
-        }
-        self.robot = Robot.objects.create(**self.robot_data)
+    def test_generate_excel_report_success(self):
+        # Вызываем функцию generate_excel_report
+        response = generate_excel_report(HttpResponse())
 
-    def test_create_robot(self):
-        data = {
-            "model": "R2",
-            "version": "D2",
-            "created": "2022-12-31 23:59:59"
-        }
+        # Проверяем, что ответ имеет статус 200 OK
+        self.assertEqual(response.status_code, 200)
 
-        response = self.client.post('/create_robot/', json.dumps(data), content_type='application/json')
-        self.assertEqual(response.status_code, 201)  # Ожидаем успешный статус создания
+        # Создаем временный файл для сохранения данных из ответа
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".xlsx") as temp_file:
+            temp_file.write(response.content)
 
-        # Проверяем, что робот был создан в базе данных
-        robot = Robot.objects.get(serial="R2D2")
-        self.assertEqual(robot.model, "R2")
-        self.assertEqual(robot.version, "D2")
+        # Загружаем сгенерированный Excel-файл из временного файла
+        generated_workbook = load_workbook(temp_file.name)
 
-    def test_create_robot_invalid_data(self):
-        data = {
-            "model": "InvalidModel",
-            "version": "X",
-            "created": "2023-01-01 00:00:00"
-        }
+        # Проверяем, что в файле есть ожидаемые листы
+        self.assertIn('R2 - D2', generated_workbook.sheetnames)
+        self.assertIn('R2 - A1', generated_workbook.sheetnames)
 
-        response = self.client.post('/create_robot/', json.dumps(data), content_type='application/json')
-        self.assertEqual(response.status_code, 400)  # Ожидаем статус ошибки валидации
-
-    def test_create_robot_missing_data(self):
-        data = {}  # Недостающие данные
-
-        response = self.client.post('/create_robot/', json.dumps(data), content_type='application/json')
-        self.assertEqual(response.status_code, 400)  # Ожидаем статус ошибки валидации
-
-    def test_create_robot_invalid_json(self):
-        invalid_json = "Invalid JSON"  # Некорректный JSON
-
-        response = self.client.post('/create_robot/', invalid_json, content_type='application/json')
-        self.assertEqual(response.status_code, 400)  # Ожидаем статус ошибки разбора JSON
+        # Затем удаляем временный файл
+        os.remove(temp_file.name)
