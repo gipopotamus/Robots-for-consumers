@@ -1,6 +1,7 @@
 from django.urls import path
-from . import services
+from . import views
 
 urlpatterns = [
-    path('report/', services.generate_excel_report, name='download_excel_report'),
+    # Добавляем URL-маршрут для создания робота
+    path('create_robot/', views.create_robot, name='create_robot'),
 ]

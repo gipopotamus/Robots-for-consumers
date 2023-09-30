@@ -11,7 +11,7 @@ class RobotCreationForm(forms.ModelForm):
         cleaned_data = super().clean()
         model = cleaned_data.get('model')
         version = cleaned_data.get('version')
-        if not Robot.objects.filter(model=model, version=version).exists():
-            raise forms.ValidationError('Модель и версия робота не существуют.')
+        # if not Robot.objects.filter(model=model, version=version).exists():
+        #     raise forms.ValidationError('Модель и версия робота не существуют.')
 
         return cleaned_data
